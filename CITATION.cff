@@ -6,7 +6,7 @@ title: MediaPipe Proctoring Solution in Python
 message: >-
   "If you use this software, please cite it using
   these metadata.
-type: software
+type: misc
 authors:
   - given-names: Thiha
     email: saw1996.dev@gmail.com
