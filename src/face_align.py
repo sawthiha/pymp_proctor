@@ -1,0 +1,170 @@
+# Copyright 2020 The MediaPipe Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""MediaPipe Face Mesh."""
+
+from typing import NamedTuple, Tuple
+
+import numpy as np
+import cv2
+
+# pylint: disable=unused-import
+from mediapipe.calculators.core import constant_side_packet_calculator_pb2
+from mediapipe.calculators.core import gate_calculator_pb2
+from mediapipe.calculators.core import split_vector_calculator_pb2
+from mediapipe.calculators.tensor import image_to_tensor_calculator_pb2
+from mediapipe.calculators.tensor import inference_calculator_pb2
+from mediapipe.calculators.tensor import tensors_to_classification_calculator_pb2
+from mediapipe.calculators.tensor import tensors_to_detections_calculator_pb2
+from mediapipe.calculators.tensor import tensors_to_landmarks_calculator_pb2
+from mediapipe.calculators.tflite import ssd_anchors_calculator_pb2
+from mediapipe.calculators.util import association_calculator_pb2
+from mediapipe.calculators.util import detections_to_rects_calculator_pb2
+from mediapipe.calculators.util import landmarks_refinement_calculator_pb2
+from mediapipe.calculators.util import logic_calculator_pb2
+from mediapipe.calculators.util import non_max_suppression_calculator_pb2
+from mediapipe.calculators.util import rect_transformation_calculator_pb2
+from mediapipe.calculators.util import thresholding_calculator_pb2
+# pylint: enable=unused-import
+from mediapipe.python.solution_base import SolutionBase
+# pylint: disable=unused-import
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_CONTOURS
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_FACE_OVAL
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_IRISES
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LEFT_EYE
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LEFT_EYEBROW
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LEFT_IRIS
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LIPS
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_RIGHT_EYE
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_RIGHT_EYEBROW
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_RIGHT_IRIS
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_TESSELATION
+# pylint: enable=unused-import
+
+FACEMESH_NUM_LANDMARKS = 468
+FACEMESH_NUM_LANDMARKS_WITH_IRISES = 478
+_BINARYPB_FILE_PATH = 'mediapipe/modules/face_landmark/face_landmark_front_cpu.binarypb'
+
+
+class FaceAlign(SolutionBase):
+  """MediaPipe Face Mesh.
+  MediaPipe Face Mesh processes an RGB image and returns the face landmarks on
+  each detected face.
+  Please refer to https://solutions.mediapipe.dev/face_mesh#python-solution-api
+  for usage examples.
+  """
+
+  def __init__(self,
+               static_image_mode=False,
+               max_num_faces=1,
+               refine_landmarks=False,
+               min_detection_confidence=0.5,
+               min_tracking_confidence=0.5):
+    """Initializes a MediaPipe Face Mesh object.
+    Args:
+      static_image_mode: Whether to treat the input images as a batch of static
+        and possibly unrelated images, or a video stream. See details in
+        https://solutions.mediapipe.dev/face_mesh#static_image_mode.
+      max_num_faces: Maximum number of faces to detect. See details in
+        https://solutions.mediapipe.dev/face_mesh#max_num_faces.
+      refine_landmarks: Whether to further refine the landmark coordinates
+        around the eyes and lips, and output additional landmarks around the
+        irises. Default to False. See details in
+        https://solutions.mediapipe.dev/face_mesh#refine_landmarks.
+      min_detection_confidence: Minimum confidence value ([0.0, 1.0]) for face
+        detection to be considered successful. See details in
+        https://solutions.mediapipe.dev/face_mesh#min_detection_confidence.
+      min_tracking_confidence: Minimum confidence value ([0.0, 1.0]) for the
+        face landmarks to be considered tracked successfully. See details in
+        https://solutions.mediapipe.dev/face_mesh#min_tracking_confidence.
+    """
+    super().__init__(
+        binary_graph_path=_BINARYPB_FILE_PATH,
+        side_inputs={
+            'num_faces': max_num_faces,
+            'with_attention': refine_landmarks,
+            'use_prev_landmarks': not static_image_mode,
+        },
+        calculator_params={
+            'facedetectionshortrangecpu__facedetectionshortrange__facedetection__TensorsToDetectionsCalculator.min_score_thresh':
+                min_detection_confidence,
+            'facelandmarkcpu__ThresholdingCalculator.threshold':
+                min_tracking_confidence,
+        },
+        outputs=['multi_face_landmarks', 'face_rects_from_detections'])
+
+  def process(self, image: np.ndarray) -> NamedTuple:
+    """Processes an RGB image and returns the face landmarks on each detected face.
+    Args:
+      image: An RGB image represented as a numpy ndarray.
+    Raises:
+      RuntimeError: If the underlying graph throws any error.
+      ValueError: If the input image is not three channel RGB.
+    Returns:
+      A NamedTuple object with a "multi_face_landmarks" field that contains the
+      face landmarks on each detected face.
+    """
+
+    return super().process(input_data={'image': image})
+
+  def face_align(self, image: np.ndarray, desired_interocular_distance = 34, size=(224, 224)) -> Tuple[Tuple[np.ndarray], NamedTuple]:
+    results = self.process(image)
+    
+    aligneds = []
+    for detection, landmarks in zip(results.face_rects_from_detections, results.multi_face_landmarks):
+      # Calculate the actual pixel values for the center offset and size of the crop
+      center_offset_pixels = (int(detection.y_center * image.shape[0]), int(detection.x_center * image.shape[1]))
+      size_pixels = (int(detection.height * image.shape[0]), int(detection.width * image.shape[1]))
+
+      # Calculate the start and end indices for the crop
+      start_y = int(center_offset_pixels[0] - size_pixels[0] / 2)
+      end_y = int(center_offset_pixels[0] + size_pixels[0] / 2)
+      start_x = int(center_offset_pixels[1] - size_pixels[1] / 2)
+      end_x = int(center_offset_pixels[1] + size_pixels[1] / 2)
+
+      # Crop the image using the start and end indices
+      cropped_image = image[start_y:end_y, start_x:end_x]
+
+      # Get the left and right eye corner coordinates
+      cropped_scale_x, cropped_scale_y = size[1] / cropped_image.shape[1], size[0] / cropped_image.shape[0]
+      left_eye_x, left_eye_y = (landmarks.landmark[243].x * image.shape[1] - start_x) * cropped_scale_x, (landmarks.landmark[243].y  * image.shape[0] - start_y) * cropped_scale_y
+      right_eye_x, right_eye_y = (landmarks.landmark[465].x * image.shape[1] - start_x) * cropped_scale_x, (landmarks.landmark[465].y  * image.shape[0] - start_y) * cropped_scale_y
+
+      cropped_image = cv2.resize(cropped_image, size, interpolation=cv2.INTER_LINEAR)
+
+      # Calculate the image center
+      image_center_x = cropped_image.shape[1] / 2
+      image_center_y = cropped_image.shape[0] / 2
+
+      # Calculate the center of the face
+      face_center_x = (left_eye_x + right_eye_x) / 2
+      face_center_y = (left_eye_y + right_eye_y) / 2
+      eyesCenter = (face_center_x, face_center_y)
+
+      # Calculate the angle of rotation
+      rotation_angle = detection.rotation
+
+      # Calculate the interocular distance
+      interocular_distance = np.sqrt((right_eye_x - left_eye_x)**2 + (right_eye_y - left_eye_y)**2)
+
+      # Calculate the scaling factor
+      scaling_factor = desired_interocular_distance / interocular_distance
+
+      M = cv2.getRotationMatrix2D((face_center_x, face_center_y), rotation_angle, scaling_factor)
+      M[0, 2] += image_center_x - face_center_x
+      M[1, 2] += image_center_y - face_center_y
+
+      # Apply the rotation, translation, and scaling transformations to the image
+      aligneds.append(cv2.warpAffine(cropped_image, M, (cropped_image.shape[1], cropped_image.shape[0]), flags=cv2.INTER_CUBIC))
+    return aligneds, results
