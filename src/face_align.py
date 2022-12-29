@@ -56,6 +56,8 @@ FACEMESH_NUM_LANDMARKS = 468
 FACEMESH_NUM_LANDMARKS_WITH_IRISES = 478
 _BINARYPB_FILE_PATH = 'mediapipe/modules/face_landmark/face_landmark_front_cpu.binarypb'
 
+def clamp(value, min_value, max_value):
+  return max(min(value, max_value), min_value)
 
 class FaceAlign(SolutionBase):
   """MediaPipe Face Mesh.
@@ -128,10 +130,10 @@ class FaceAlign(SolutionBase):
       size_pixels = (int(detection.height * image.shape[0]), int(detection.width * image.shape[1]))
 
       # Calculate the start and end indices for the crop
-      start_y = int(center_offset_pixels[0] - size_pixels[0] / 2)
-      end_y = int(center_offset_pixels[0] + size_pixels[0] / 2)
-      start_x = int(center_offset_pixels[1] - size_pixels[1] / 2)
-      end_x = int(center_offset_pixels[1] + size_pixels[1] / 2)
+      start_y = clamp(int(center_offset_pixels[0] - size_pixels[0] / 2), 0, image.shape[0])
+      end_y = clamp(int(center_offset_pixels[0] + size_pixels[0] / 2), 0, image.shape[0])
+      start_x = clamp(int(center_offset_pixels[1] - size_pixels[1] / 2), 0, image.shape[1])
+      end_x = clamp(int(center_offset_pixels[1] + size_pixels[1] / 2), 0, image.shape[1])
 
       # Crop the image using the start and end indices
       cropped_image = image[start_y:end_y, start_x:end_x]
