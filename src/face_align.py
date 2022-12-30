@@ -120,7 +120,7 @@ class FaceAlign(SolutionBase):
 
     return super().process(input_data={'image': image})
 
-  def face_align(self, image: np.ndarray, desired_interocular_distance = 34, size=(224, 224)) -> Tuple[Tuple[np.ndarray], NamedTuple]:
+  def face_align(self, image: np.ndarray, desired_interocular_distance = 44, face_center=(0.5, 0.4), size=(224, 224)) -> Tuple[Tuple[np.ndarray], NamedTuple]:
     results = self.process(image)
     
     aligneds = []
@@ -140,22 +140,25 @@ class FaceAlign(SolutionBase):
 
       # Get the left and right eye corner coordinates
       cropped_scale_x, cropped_scale_y = size[1] / cropped_image.shape[1], size[0] / cropped_image.shape[0]
-      left_eye_x, left_eye_y = (landmarks.landmark[243].x * image.shape[1] - start_x) * cropped_scale_x, (landmarks.landmark[243].y  * image.shape[0] - start_y) * cropped_scale_y
-      right_eye_x, right_eye_y = (landmarks.landmark[465].x * image.shape[1] - start_x) * cropped_scale_x, (landmarks.landmark[465].y  * image.shape[0] - start_y) * cropped_scale_y
+      landmarks = (np.array([[landmark.x, landmark.y] for landmark in landmarks.landmark]) * np.array([image.shape[1], image.shape[0]]) - np.array([start_x, start_y])) * np.array([cropped_scale_x, cropped_scale_y])
+
+      left_eye_x, left_eye_y = landmarks[[7, 33, 33, 144, 145, 153, 154, 155, 157, 158, 159, 160, 161, 163, 173, 246]].mean(axis=0)
+      right_eye_x, right_eye_y = landmarks[[249, 263, 263, 373, 374, 380, 381, 382, 384, 385, 386, 387, 388, 390, 398, 466]].mean(axis=0)
 
       cropped_image = cv2.resize(cropped_image, size, interpolation=cv2.INTER_LINEAR)
 
       # Calculate the image center
-      image_center_x = cropped_image.shape[1] / 2
-      image_center_y = cropped_image.shape[0] / 2
+      image_center_x = cropped_image.shape[1] * face_center[0]
+      image_center_y = cropped_image.shape[0] * face_center[1]
 
       # Calculate the center of the face
-      face_center_x = (left_eye_x + right_eye_x) / 2
-      face_center_y = (left_eye_y + right_eye_y) / 2
-      eyesCenter = (face_center_x, face_center_y)
+      face_center_x = (left_eye_x + right_eye_x) // 2
+      face_center_y = (left_eye_y + right_eye_y) // 2
 
       # Calculate the angle of rotation
-      rotation_angle = detection.rotation
+      dY = left_eye_y - right_eye_y
+      dX = left_eye_x - right_eye_x
+      rotation_angle = np.degrees(np.arctan2(dY, dX)) - 180
 
       # Calculate the interocular distance
       interocular_distance = np.sqrt((right_eye_x - left_eye_x)**2 + (right_eye_y - left_eye_y)**2)
@@ -169,4 +172,5 @@ class FaceAlign(SolutionBase):
 
       # Apply the rotation, translation, and scaling transformations to the image
       aligneds.append(cv2.warpAffine(cropped_image, M, (cropped_image.shape[1], cropped_image.shape[0]), flags=cv2.INTER_CUBIC))
+
     return aligneds, results
