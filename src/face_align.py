@@ -124,6 +124,8 @@ class FaceAlign(SolutionBase):
     results = self.process(image)
     
     aligneds = []
+    if results.face_rects_from_detections == None or results.multi_face_landmarks == None:
+      return aligneds, results
     for detection, landmarks in zip(results.face_rects_from_detections, results.multi_face_landmarks):
       # Calculate the actual pixel values for the center offset and size of the crop
       center_offset_pixels = (int(detection.y_center * image.shape[0]), int(detection.x_center * image.shape[1]))
