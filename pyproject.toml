@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "pymp_proctor"
-version = "0.1.1"
+version = "0.1.2"
 description = "MediaPipe Proctoring Toolkit Python Implementation"
 readme = "README.md"
 authors = ["sawthiha <saw1996.dev@gmail.com>"]

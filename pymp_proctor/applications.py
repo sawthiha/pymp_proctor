@@ -116,7 +116,7 @@ def webcam_proctor():
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             for idx, result in enumerate(results):
-                image = draw_stats(image, image.shape[1], image.shape[0], idx)
+                image = draw_stats(image, image.shape[1], image.shape[0], idx, result)
 
             # Flip the image horizontally for a selfie-view display.
             cv2.imshow("MediaPipe Proctoring Toolkit", cv2.flip(image, 1))
