@@ -44,7 +44,7 @@ def draw_stats(img, width, height, idx, result):
         img = draw_text_center(
             img,
             "Blink",
-            (width - 350, y + 89),
+            (width - 300, y + 89),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.8,
             (0, 0, 255),
@@ -54,7 +54,7 @@ def draw_stats(img, width, height, idx, result):
         img = draw_text_center(
             img,
             "Blink",
-            (width - 150, y + 89),
+            (width - 100, y + 89),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.8,
             (0, 0, 255),
@@ -93,6 +93,7 @@ def draw_stats(img, width, height, idx, result):
 def webcam_proctor():
     # For webcam input:
     cap = cv2.VideoCapture(0)
+    cv2.namedWindow("MediaPipe Proctoring Toolkit", cv2.WINDOW_NORMAL)
     with Proctor(
         max_num_faces=1,
         refine_landmarks=True,
@@ -108,6 +109,7 @@ def webcam_proctor():
 
             # To improve performance, optionally mark the image as not writeable to
             # pass by reference.
+            image = cv2.flip(image, 1)
             image.flags.writeable = False
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             results = proctor.proctor(image)
@@ -119,7 +121,7 @@ def webcam_proctor():
                 image = draw_stats(image, image.shape[1], image.shape[0], idx, result)
 
             # Flip the image horizontally for a selfie-view display.
-            cv2.imshow("MediaPipe Proctoring Toolkit", cv2.flip(image, 1))
+            cv2.imshow("MediaPipe Proctoring Toolkit", image)
             if cv2.waitKey(5) & 0xFF == 27:
                 break
     cap.release()
