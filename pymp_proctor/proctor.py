@@ -317,10 +317,7 @@ class Proctor(SolutionBase):
 
     def proctor(self, image: np.ndarray) -> Tuple[dict]:
         results = self.process(image)
-        if (
-            results.face_rects_from_detections == None
-            or results.multi_face_landmarks == None
-        ):
+        if results.multi_face_landmarks == None:
             return []
 
         return [self._evaluate(landmarks) for landmarks in results.multi_face_landmarks]
