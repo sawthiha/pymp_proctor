@@ -292,7 +292,9 @@ class Proctor(SolutionBase):
 
         leftELD = eval_left_eld(landmarks)
         rightELD = eval_right_eld(landmarks)
-        threshold = 0.4163 * o_y
+        threshold = (
+            (-0.0228 * o_x) + (0.0162 * o_y) + (0.0792 * np.exp(np.square(o_y))) + 0.08
+        )
 
         facial_activity = (
             np.linalg.norm(landmarks - self.prev_landmarks, ord=2)
